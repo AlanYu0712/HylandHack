@@ -1,0 +1,60 @@
+import time
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
+import os
+import sys
+
+file = list()
+
+
+def get_download_path():
+    """Returns the default downloads path for linux or windows"""
+    if os.name == 'nt':
+        import winreg
+        sub_key = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
+        downloads_guid = '{374DE290-123F-4565-9164-39C4925E467B}'
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub_key) as key:
+            location = winreg.QueryValueEx(key, downloads_guid)[0]
+        return location
+    else:
+        return os.path.join(os.path.expanduser('~'), 'downloads')
+
+
+result = get_download_path()
+
+
+class MyEventHandler(FileSystemEventHandler):
+    def __init__(self, observer, filename):
+        self.observer = observer
+        self.filename = filename
+
+    def on_created(self, event):
+        print("e=", event)
+        filename = str(event)
+        l = len(filename) - 2
+        file.append(filename[29:l])
+        print(file)
+        if not event.is_directory and event.src_path.endswith(self.filename):
+            print("file created")
+            self.observer.unschedule_all()
+            self.observer.stop()
+
+
+
+def detect(argv=None):
+    if __name__ == "__main__":
+        filename = argv[0]
+        observer = Observer()
+        event_handler = MyEventHandler(observer, filename)
+        observer.schedule(event_handler, result, recursive=True)
+        observer.start()
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            observer.stop()
+        observer.join()
+
+
+if __name__ == '__main__':
+    sys.exit(detect(sys.argv))
